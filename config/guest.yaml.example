@@ -7,7 +7,10 @@ vmid: 100
 # Path to the mounted Unix Domain Socket
 socket_path: "/run/lxc-hotplug/100.sock"
 
-# Target device directory in container (usually /dev)
+# Path where the host's actual /dev is mounted inside the container
+host_dev_dir: "/dev/.lxc/dev"
+
+# Target device directory in container (standard /dev)
 target_dev_dir: "/dev"
 
 # Debounce timer configuration

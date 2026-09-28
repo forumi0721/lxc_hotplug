@@ -1,11 +1,11 @@
 """
 Host Agent main daemon loop.
-Coordinates Netlink listener, device cache, cgroup permissions, shared dev mirroring, and IPC server.
+Coordinates Netlink listener, device cache, cgroup permissions, and IPC server.
+Host's actual /dev is mounted directly into container as /dev/.lxc/dev.
 """
 
 import os
 import sys
-import stat
 import select
 import signal
 import logging
@@ -31,7 +31,6 @@ class HostAgentDaemon:
         self.config = load_config(config_path)
 
         self.socket_dir = self.config.get("socket_dir", "/run/lxc-hotplug")
-        self.shared_dev_base = self.config.get("shared_dev_base", "/dev/.lxc/dev")
         self.monitored_subsystems = set(self.config.get("subsystems", ["hidraw", "hiddev", "tty", "sound"]))
         self.containers = self.config.get("containers", [])
 
@@ -50,42 +49,9 @@ class HostAgentDaemon:
         self.seq += 1
         return self.seq
 
-    def _mirror_node_to_shared_dir(self, vmid: int, devname: str, major: int, minor: int):
-        """Creates/mirrors character device node in /dev/.lxc/dev/<vmid>/<devname>."""
-        shared_node_path = os.path.join(self.shared_dev_base, str(vmid), devname)
-        try:
-            os.makedirs(os.path.dirname(shared_node_path), exist_ok=True)
-            if os.path.exists(shared_node_path):
-                os.unlink(shared_node_path)
-            mode = stat.S_IFCHR | 0o660
-            dev = os.makedev(major, minor)
-            os.mknod(shared_node_path, mode, dev)
-            os.chmod(shared_node_path, 0o660)
-            self.logger.debug(f"[VMID {vmid}] Mirrored shared device node: {shared_node_path} (c {major}:{minor})")
-        except OSError as e:
-            self.logger.warning(f"[VMID {vmid}] Failed to mirror shared node {shared_node_path}: {e}")
-
-    def _unmirror_node_from_shared_dir(self, vmid: int, devname: str):
-        """Removes mirrored node in /dev/.lxc/dev/<vmid>/<devname>."""
-        shared_node_path = os.path.join(self.shared_dev_base, str(vmid), devname)
-        try:
-            if os.path.exists(shared_node_path):
-                os.unlink(shared_node_path)
-                self.logger.debug(f"[VMID {vmid}] Cleaned up shared node: {shared_node_path}")
-        except OSError as e:
-            self.logger.debug(f"[VMID {vmid}] Error unlinking shared node {shared_node_path}: {e}")
-
     def _on_guest_connected(self, client: ClientConnection):
-        """Sends full initial snapshot when a guest connects, ensuring shared nodes exist."""
+        """Sends full initial snapshot when a guest connects."""
         devices = self.cache.get_all()
-        # Ensure all cached devices are mirrored into this container's shared dev dir
-        for dev in devices:
-            devname = dev.get("devname")
-            major = dev.get("major")
-            minor = dev.get("minor")
-            if devname and major is not None and minor is not None:
-                self._mirror_node_to_shared_dir(client.vmid, devname, major, minor)
-
         sync_msg = create_initial_sync_message(self._next_seq(), devices)
         client.send(sync_msg)
         self.logger.info(
@@ -130,7 +96,7 @@ class HostAgentDaemon:
                 f"[UEVENT ADD] {subsystem}/{devname} (VID:{metadata['vendor_id']}, PID:{metadata['product_id']})"
             )
 
-            # Process permissions, mirror to /dev/.lxc/dev, and dispatch to containers
+            # Process permissions and dispatch to containers
             for c_info in self.containers:
                 if not c_info.get("enabled", True):
                     continue
@@ -139,9 +105,6 @@ class HostAgentDaemon:
                     continue
 
                 allowed = self.cgroup.ensure_device_access(vmid, devname, major, minor)
-                # Place node in /dev/.lxc/dev/<vmid>/<devname>
-                self._mirror_node_to_shared_dir(vmid, devname, major, minor)
-
                 event_payload = dict(device_entry)
                 event_payload["cgroup_allowed"] = allowed
                 msg = create_hotplug_event_message(self._next_seq(), ACTION_ADD, event_payload)
@@ -170,27 +133,19 @@ class HostAgentDaemon:
             self.logger.info(
                 f"[UEVENT REMOVE] {subsystem}/{devname} (cached={cached is not None})"
             )
-
-            # Remove mirrored nodes in /dev/.lxc/dev/<vmid>/<devname>
-            for c_info in self.containers:
-                vmid = c_info.get("vmid")
-                if vmid:
-                    self._unmirror_node_from_shared_dir(vmid, devname)
-
             msg = create_hotplug_event_message(self._next_seq(), ACTION_REMOVE, device_entry)
             self.server.broadcast_to_all(msg)
 
     def run(self):
         """Starts Host Agent and enters main I/O event loop."""
         self.logger.info(f"Starting LXC Hotplug Host Agent (config: {self.config_path})...")
-        self.logger.info(f"Shared dev base: {self.shared_dev_base}, Socket dir: {self.socket_dir}")
+        self.logger.info(f"Socket dir: {self.socket_dir}")
 
-        # Setup sockets and shared dirs for each enabled container
+        # Setup sockets for each enabled container
         for c_info in self.containers:
             if c_info.get("enabled", True) and "vmid" in c_info:
                 vmid = c_info["vmid"]
                 self.server.register_vmid(vmid)
-                os.makedirs(os.path.join(self.shared_dev_base, str(vmid)), mode=0o755, exist_ok=True)
 
         self.netlink.start()
         self.running = True

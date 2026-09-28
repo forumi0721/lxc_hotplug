@@ -1,6 +1,7 @@
 """
 Guest Agent main daemon loop.
 Coordinates IPC client, rule filter, node operator, debounce timer, and post-triggers.
+Inspects mounted host /dev (/dev/.lxc/dev) and replicates identical nodes into container's /dev.
 """
 
 import sys
@@ -30,7 +31,8 @@ class GuestAgentDaemon:
         self.vmid = int(self.config.get("vmid", 0))
         self.socket_path = self.config.get("socket_path", f"/run/lxc-hotplug/{self.vmid}.sock")
         self.target_dev_dir = self.config.get("target_dev_dir", "/dev")
-        self.shared_dev_dir = self.config.get("shared_dev_dir", "/dev/.lxc/dev")
+        # /dev/.lxc/dev is the mount point of host's actual /dev
+        self.host_dev_dir = self.config.get("host_dev_dir", "/dev/.lxc/dev")
 
         # Timer settings
         t_cfg = self.config.get("timer", {})
@@ -73,10 +75,10 @@ class GuestAgentDaemon:
                 major = dev.get("major")
                 minor = dev.get("minor")
                 if devname:
-                    # Inspect /dev/.lxc/dev and replicate via mknod
-                    if self.node_engine.create_node_from_shared(
+                    # Inspect mounted host /dev (/dev/.lxc/dev) and replicate into container /dev
+                    if self.node_engine.replicate_from_host_dev(
                         devname=devname,
-                        shared_dev_dir=self.shared_dev_dir,
+                        host_dev_dir=self.host_dev_dir,
                         fallback_major=major,
                         fallback_minor=minor
                     ):
@@ -86,7 +88,6 @@ class GuestAgentDaemon:
 
         self.logger.info(f"Initial sync complete. {synced_count} node(s) created in {self.target_dev_dir}.")
         if synced_count > 0:
-            # Trigger once on initial sync
             self.trigger_engine.execute_triggers()
 
     def _handle_hotplug_event(self, action: str, dev: Dict[str, Any]):
@@ -103,11 +104,10 @@ class GuestAgentDaemon:
                 self.logger.info(f"[DROP ADD] Device {devname} does not match guest filter rules.")
                 return
 
-            self.logger.info(f"[ACCEPT ADD] Mirroring device from {self.shared_dev_dir}/{devname} to {self.target_dev_dir}/{devname}")
-            # Inspect /dev/.lxc/dev and replicate via mknod
-            self.node_engine.create_node_from_shared(
+            self.logger.info(f"[ACCEPT ADD] Replicating from {self.host_dev_dir}/{devname} to {self.target_dev_dir}/{devname}")
+            self.node_engine.replicate_from_host_dev(
                 devname=devname,
-                shared_dev_dir=self.shared_dev_dir,
+                host_dev_dir=self.host_dev_dir,
                 fallback_major=major,
                 fallback_minor=minor
             )
@@ -123,7 +123,7 @@ class GuestAgentDaemon:
     def run(self):
         """Starts Guest Agent daemon loop."""
         self.logger.info(f"Starting LXC Hotplug Guest Agent (VMID {self.vmid}, config: {self.config_path})...")
-        self.logger.info(f"Shared dev dir: {self.shared_dev_dir}, Target dev dir: {self.target_dev_dir}")
+        self.logger.info(f"Host /dev mount path: {self.host_dev_dir}, Container /dev path: {self.target_dev_dir}")
         self.running = True
 
         def _signal_handler(signum, frame):
