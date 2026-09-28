@@ -1,0 +1,20 @@
+# /etc/lxc-hotplug/host.yaml
+# Proxmox VE Host Agent Configuration
+
+# Unix Domain Socket directory for VMID-isolated sockets
+socket_dir: "/run/lxc-hotplug"
+
+# Monitored USB device subsystems
+subsystems:
+  - hidraw
+  - hiddev
+  - tty
+  - sound
+
+# Dynamic cgroup injection using `lxc-device add` when unknown major detected
+dynamic_cgroup_inject: true
+
+# Target LXC Containers to service
+containers:
+  - vmid: 100
+    enabled: true

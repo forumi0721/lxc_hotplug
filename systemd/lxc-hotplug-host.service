@@ -1,0 +1,19 @@
+[Unit]
+Description=LXC USB Hotplug Host Agent (Proxmox VE)
+After=network.target local-fs.target pve-cluster.service
+Documentation=https://github.com/forumi0721/lxc_hotplug
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/lxc_hotplug
+Environment=PYTHONPATH=/opt/lxc_hotplug/src
+ExecStart=/usr/bin/python3 -m lxc_hotplug host --config /etc/lxc-hotplug/host.yaml
+Restart=always
+RestartSec=3
+KillMode=process
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

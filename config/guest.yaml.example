@@ -1,0 +1,39 @@
+# /etc/lxc-hotplug/guest.yaml
+# Privileged LXC Container Guest Agent Configuration
+
+# Container VMID matching the host mapping
+vmid: 100
+
+# Path to the mounted Unix Domain Socket
+socket_path: "/run/lxc-hotplug/100.sock"
+
+# Target device directory in container (usually /dev)
+target_dev_dir: "/dev"
+
+# Debounce timer configuration
+timer:
+  initial_window_sec: 10.0
+  extend_window_sec: 5.0
+  max_window_sec: 30.0
+  inactivity_sec: 3.0
+
+# Post-stabilization trigger configuration
+trigger:
+  udevadm_trigger: true
+  hook_script: "/etc/lxc-hotplug/hooks.d/on-change.sh"
+
+# Whitelist device filters (Devices matching ANY rule are accepted)
+filters:
+  # Accept all USB serial ports (Zigbee, Z-Wave, Arduino, etc.)
+  - subsystem: "tty"
+    devname_pattern: "ttyACM*|ttyUSB*"
+
+  # Accept specific USB Sound Card by VID/PID
+  - subsystem: "sound"
+    vendor_id: "0d8c"
+    product_id: "0014"
+
+  # Accept specific Logitech HID Receiver
+  - subsystem: "hidraw"
+    vendor_id: "046d"
+    product_id: "c52b"
