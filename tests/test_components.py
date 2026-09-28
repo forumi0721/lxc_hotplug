@@ -5,6 +5,7 @@ Unit tests for LXC USB Hotplug components.
 import unittest
 import time
 import os
+import stat
 import tempfile
 
 from lxc_hotplug.common.protocol import (
@@ -16,6 +17,7 @@ from lxc_hotplug.common.socket_utils import LineStreamBuffer
 from lxc_hotplug.common.config import load_config
 from lxc_hotplug.guest.filter import DeviceFilterEngine
 from lxc_hotplug.guest.timer import DebounceTimerEngine
+from lxc_hotplug.guest.mknod import DeviceNodeEngine
 from lxc_hotplug.host.cache import ActiveDeviceCache
 
 
@@ -123,6 +125,22 @@ class TestDeviceCache(unittest.TestCase):
         self.assertIsNotNone(removed)
         self.assertEqual(removed["vendor_id"], "10c4")
         self.assertEqual(len(cache.get_all()), 0)
+
+
+class TestSharedNodeInspection(unittest.TestCase):
+    def test_remove_node_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            node_engine = DeviceNodeEngine(target_dev_dir=tmp_dir)
+            # Remove non-existent node should succeed without error
+            self.assertTrue(node_engine.remove_node("non_existent_dev"))
+
+            # Create dummy file and remove
+            test_file = os.path.join(tmp_dir, "testdev")
+            with open(test_file, "w") as f:
+                f.write("test")
+            self.assertTrue(os.path.exists(test_file))
+            self.assertTrue(node_engine.remove_node("testdev"))
+            self.assertFalse(os.path.exists(test_file))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 """
 Device Node Operator for Guest Agent.
 Performs privileged mknod and idempotent unlink on target /dev paths.
+Supports inspecting shared mount directory (/dev/.lxc/dev) and replicating identical nodes.
 """
 
 import os
@@ -43,6 +44,42 @@ class DeviceNodeEngine:
             return False
         except OSError as e:
             self.logger.error(f"Failed to create {target_path}: {e}")
+            return False
+
+    def create_node_from_shared(
+        self,
+        devname: str,
+        shared_dev_dir: str,
+        fallback_major: Optional[int] = None,
+        fallback_minor: Optional[int] = None
+    ) -> bool:
+        """
+        Inspects the device node in shared_dev_dir/devname placed by Host,
+        reads its stat (major/minor), and replicates it in target_dev_dir/devname using mknod.
+        """
+        shared_path = os.path.join(shared_dev_dir, devname)
+        if not os.path.exists(shared_path):
+            if fallback_major is not None and fallback_minor is not None:
+                self.logger.warning(
+                    f"Shared node not found at {shared_path}. Falling back to IPC major:minor ({fallback_major}:{fallback_minor})"
+                )
+                return self.create_node(devname, fallback_major, fallback_minor)
+            self.logger.error(f"Shared device node not found at {shared_path}")
+            return False
+
+        try:
+            st = os.stat(shared_path)
+            if not stat.S_ISCHR(st.st_mode):
+                self.logger.warning(f"Shared node {shared_path} is not a character device (mode={oct(st.st_mode)})")
+
+            major = os.major(st.st_rdev)
+            minor = os.minor(st.st_rdev)
+            self.logger.info(f"Inspected shared device at {shared_path} -> c {major}:{minor}")
+            return self.create_node(devname, major, minor)
+        except OSError as e:
+            self.logger.error(f"Failed to inspect shared device {shared_path}: {e}")
+            if fallback_major is not None and fallback_minor is not None:
+                return self.create_node(devname, fallback_major, fallback_minor)
             return False
 
     def remove_node(self, devname: str) -> bool:

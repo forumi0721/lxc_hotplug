@@ -30,6 +30,7 @@ class GuestAgentDaemon:
         self.vmid = int(self.config.get("vmid", 0))
         self.socket_path = self.config.get("socket_path", f"/run/lxc-hotplug/{self.vmid}.sock")
         self.target_dev_dir = self.config.get("target_dev_dir", "/dev")
+        self.shared_dev_dir = self.config.get("shared_dev_dir", "/dev/.lxc/dev")
 
         # Timer settings
         t_cfg = self.config.get("timer", {})
@@ -71,8 +72,14 @@ class GuestAgentDaemon:
                 devname = dev.get("devname")
                 major = dev.get("major")
                 minor = dev.get("minor")
-                if devname and major is not None and minor is not None:
-                    if self.node_engine.create_node(devname, major, minor):
+                if devname:
+                    # Inspect /dev/.lxc/dev and replicate via mknod
+                    if self.node_engine.create_node_from_shared(
+                        devname=devname,
+                        shared_dev_dir=self.shared_dev_dir,
+                        fallback_major=major,
+                        fallback_minor=minor
+                    ):
                         synced_count += 1
             else:
                 self.logger.debug(f"Filtered out initial device: {dev.get('devname')}")
@@ -96,13 +103,17 @@ class GuestAgentDaemon:
                 self.logger.info(f"[DROP ADD] Device {devname} does not match guest filter rules.")
                 return
 
-            self.logger.info(f"[ACCEPT ADD] Creating node for {devname} (c {major}:{minor})")
-            if major is not None and minor is not None:
-                self.node_engine.create_node(devname, major, minor)
-                self.timer_engine.on_device_event()
+            self.logger.info(f"[ACCEPT ADD] Mirroring device from {self.shared_dev_dir}/{devname} to {self.target_dev_dir}/{devname}")
+            # Inspect /dev/.lxc/dev and replicate via mknod
+            self.node_engine.create_node_from_shared(
+                devname=devname,
+                shared_dev_dir=self.shared_dev_dir,
+                fallback_major=major,
+                fallback_minor=minor
+            )
+            self.timer_engine.on_device_event()
 
         elif action == ACTION_REMOVE:
-            # For remove, check filter if metadata exists, or check if local node exists
             is_matched = self.filter_engine.is_accepted(dev) if (dev.get("vendor_id") or dev.get("subsystem")) else True
             if is_matched:
                 self.logger.info(f"[ACCEPT REMOVE] Removing node for {devname}")
@@ -112,6 +123,7 @@ class GuestAgentDaemon:
     def run(self):
         """Starts Guest Agent daemon loop."""
         self.logger.info(f"Starting LXC Hotplug Guest Agent (VMID {self.vmid}, config: {self.config_path})...")
+        self.logger.info(f"Shared dev dir: {self.shared_dev_dir}, Target dev dir: {self.target_dev_dir}")
         self.running = True
 
         def _signal_handler(signum, frame):
