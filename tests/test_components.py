@@ -143,5 +143,28 @@ class TestSharedNodeInspection(unittest.TestCase):
             self.assertFalse(os.path.exists(test_file))
 
 
+class TestStandalonePackage(unittest.TestCase):
+    def test_host_only_package_execution(self):
+        """Verifies that running host agent does not require guest module to be present."""
+        import subprocess, shutil
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pkgdir = os.path.join(tmpdir, "lxc_hotplug")
+            os.makedirs(pkgdir)
+            shutil.copy2("src/lxc_hotplug/__init__.py", pkgdir)
+            shutil.copy2("src/lxc_hotplug/__main__.py", pkgdir)
+            shutil.copytree("src/lxc_hotplug/common", os.path.join(pkgdir, "common"))
+            shutil.copytree("src/lxc_hotplug/host", os.path.join(pkgdir, "host"))
+            # guest module is intentionally not installed
+
+            res = subprocess.run(
+                ["python3", "-m", "lxc_hotplug", "host", "--help"],
+                env={"PYTHONPATH": tmpdir, "PATH": os.environ["PATH"]},
+                capture_output=True,
+                text=True
+            )
+            self.assertEqual(res.returncode, 0)
+            self.assertIn("Path to host config file", res.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

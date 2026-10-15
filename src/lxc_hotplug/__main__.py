@@ -1,13 +1,12 @@
 """
 Unified CLI entry point for LXC USB Hotplug.
 Supports running either Host Agent or Guest Agent via subcommands.
+Uses lazy imports so Host-only or Guest-only standalone packages work without ModuleNotFoundError.
 """
 
 import sys
 import argparse
 from lxc_hotplug import __version__
-from lxc_hotplug.host.daemon import HostAgentDaemon
-from lxc_hotplug.guest.daemon import GuestAgentDaemon
 
 
 def main():
@@ -42,9 +41,19 @@ def main():
     args = parser.parse_args()
 
     if args.subcommand == "host":
+        try:
+            from lxc_hotplug.host.daemon import HostAgentDaemon
+        except ImportError as e:
+            print(f"Error: Host Agent module not found in this package ({e}).", file=sys.stderr)
+            sys.exit(1)
         daemon = HostAgentDaemon(config_path=args.config)
         daemon.run()
     elif args.subcommand == "guest":
+        try:
+            from lxc_hotplug.guest.daemon import GuestAgentDaemon
+        except ImportError as e:
+            print(f"Error: Guest Agent module not found in this package ({e}).", file=sys.stderr)
+            sys.exit(1)
         daemon = GuestAgentDaemon(config_path=args.config)
         daemon.run()
     else:
