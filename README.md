@@ -152,5 +152,49 @@ filters:
 
 ---
 
+## 📦 소스 배포 및 ZIP 패키징
+
+Makefile을 통해 호스트 및 게스트용 독립 배포 ZIP 패키지를 즉시 생성할 수 있습니다:
+
+```bash
+# 전체 빌드 및 테스트, 모든 ZIP 패키지 생성
+make dist
+
+# 개별 패키지 생성
+make host-zip    # dist/lxc-hotplug-host.zip 생성 (호스트용)
+make guest-zip   # dist/lxc-hotplug-guest.zip 생성 (게스트용)
+make all-zip     # dist/lxc-hotplug-all.zip 생성 (전체 소스)
+```
+
+### 배포 및 설치 방법
+
+#### 1) Proxmox 호스트 배포
+```bash
+# 1. 호스트로 zip 복사 후 압축 해제
+unzip lxc-hotplug-host.zip -d /tmp/lxc_host
+cd /tmp/lxc_host
+
+# 2. 설치 스크립트 실행 (/opt/lxc_hotplug 로 자동 배포 및 systemd 등록)
+sudo bash scripts/install-host.sh
+
+# 3. /etc/lxc-hotplug/host.yaml 수정 후 서비스 시작
+sudo systemctl start lxc-hotplug-host.service
+```
+
+#### 2) LXC 컨테이너 배포
+```bash
+# 1. 컨테이너 내부로 zip 복사 후 압축 해제
+unzip lxc-hotplug-guest.zip -d /tmp/lxc_guest
+cd /tmp/lxc_guest
+
+# 2. 설치 스크립트 실행 (/opt/lxc_hotplug 로 자동 배포 및 systemd 등록)
+sudo bash scripts/install-guest.sh
+
+# 3. /etc/lxc-hotplug/guest.yaml 수정 후 서비스 시작
+sudo systemctl start lxc-hotplug-guest.service
+```
+
+---
+
 ## 📄 라이선스
 MIT License
