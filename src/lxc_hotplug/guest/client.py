@@ -31,6 +31,7 @@ class GuestIPCClient:
         self._backoff = 2.0
         self._max_backoff = 30.0
         self._last_connect_attempt = 0.0
+        self._warned_missing_socket = False
 
     @property
     def fileno(self) -> int:
@@ -49,9 +50,18 @@ class GuestIPCClient:
 
         self._last_connect_attempt = now
         if not os.path.exists(self.socket_path):
-            self.logger.debug(f"Host socket does not exist yet: {self.socket_path}. Retrying in {self._backoff:.1f}s...")
+            if not self._warned_missing_socket:
+                self.logger.warning(
+                    f"Host socket not found: {self.socket_path}. "
+                    f"Please verify host agent is active and /run/lxc-hotplug is mounted from host. Retrying in background..."
+                )
+                self._warned_missing_socket = True
+            else:
+                self.logger.debug(f"Host socket does not exist yet: {self.socket_path}. Retrying in {self._backoff:.1f}s...")
             self._increase_backoff()
             return False
+
+        self._warned_missing_socket = False
 
         try:
             s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)

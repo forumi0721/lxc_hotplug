@@ -13,6 +13,7 @@ import stat
 import time
 import shutil
 import subprocess
+import tarfile
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DIST_DIR = os.path.join(ROOT_DIR, "dist")
@@ -127,12 +128,16 @@ def build_arch(role: str):
         for filename in filenames
     )
 
+    now = int(time.time())
+
     # 5. Generate .PKGINFO
     pkginfo_content = f"""pkgname = {pkg_name}
+pkgbase = {pkg_name}
+xdata = pkgtype=pkg
 pkgver = {VERSION}-1
 pkgdesc = LXC USB Hotplug {role.capitalize()} Agent for Arch Linux
 url = https://github.com/forumi0721/lxc_hotplug
-builddate = {int(time.time())}
+builddate = {now}
 packager = LXC Hotplug Team
 size = {total_size}
 arch = any
@@ -143,18 +148,58 @@ backup = etc/lxc-hotplug/{role}.yaml
     with open(os.path.join(staging_dir, ".PKGINFO"), "w", encoding="utf-8") as f:
         f.write(pkginfo_content)
 
+    # Generate .BUILDINFO
+    buildinfo_content = f"""format = 2
+pkgname = {pkg_name}
+pkgbase = {pkg_name}
+pkgver = {VERSION}-1
+pkgarch = any
+pkgbuild_sha256sum = 0000000000000000000000000000000000000000000000000000000000000000
+packager = LXC Hotplug Team
+builddate = {now}
+builddir = /build
+buildenv = !distcc !color !ccache check !sign
+options = !strip !docs !libtool !staticlibs emptydirs !zipman !purge !debug !lto !autodeps
+installed = python-3.12.0-1-any
+"""
+    with open(os.path.join(staging_dir, ".BUILDINFO"), "w", encoding="utf-8") as f:
+        f.write(buildinfo_content)
+
     # Copy install scriptlet as .INSTALL
     install_src = os.path.join(ROOT_DIR, "packaging", "arch", role, f"{pkg_name}.install")
     if os.path.exists(install_src):
         shutil.copy2(install_src, os.path.join(staging_dir, ".INSTALL"))
 
-    # 6. Compress with tar + zstd
+    # 6. Compress with python tarfile streamed directly to zstd (no './' prefix on entries)
     output_pkg = os.path.join(DIST_DIR, f"{pkg_name}-{VERSION}-1-any.pkg.tar.zst")
     if os.path.exists(output_pkg):
         os.unlink(output_pkg)
-    # Run tar pipe into zstd (-f to force overwrite)
-    tar_cmd = f"tar -C '{staging_dir}' --owner=0 --group=0 -cf - . | zstd -T0 -19 -f -o '{output_pkg}'"
-    subprocess.run(tar_cmd, shell=True, check=True)
+
+    def reset_tarinfo(tarinfo):
+        tarinfo.uid = 0
+        tarinfo.gid = 0
+        tarinfo.uname = "root"
+        tarinfo.gname = "root"
+        if tarinfo.isdir():
+            tarinfo.mode = 0o755
+        elif tarinfo.name in (".PKGINFO", ".BUILDINFO", ".INSTALL"):
+            tarinfo.mode = 0o644
+        return tarinfo
+
+    zstd_proc = subprocess.Popen(
+        ["zstd", "-T0", "-19", "-f", "-o", output_pkg],
+        stdin=subprocess.PIPE,
+        stderr=subprocess.DEVNULL
+    )
+    with tarfile.open(fileobj=zstd_proc.stdin, mode="w|") as tar:
+        for item in sorted(os.listdir(staging_dir)):
+            item_path = os.path.join(staging_dir, item)
+            tar.add(item_path, arcname=item, filter=reset_tarinfo)
+    zstd_proc.stdin.close()
+    zstd_proc.wait()
+    if zstd_proc.returncode != 0:
+        raise RuntimeError(f"zstd compression failed with code {zstd_proc.returncode}")
+
     print(f"[ARCH] Built {output_pkg} ({os.path.getsize(output_pkg)} bytes)")
 
 
@@ -209,10 +254,22 @@ echo "Installation complete! Start service via: rc-service {pkg_name} start"
 """)
     os.chmod(installer_path, 0o755)
 
-    # 5. Compress into tar.gz
+    # 5. Compress into tar.gz without './' prefix
     output_tar = os.path.join(DIST_DIR, f"{pkg_name}-{VERSION}-alpine.tar.gz")
-    tar_cmd = f"tar -C '{staging_dir}' --owner=0 --group=0 -czf '{output_tar}' ."
-    subprocess.run(tar_cmd, shell=True, check=True)
+    if os.path.exists(output_tar):
+        os.unlink(output_tar)
+
+    def reset_tarinfo(tarinfo):
+        tarinfo.uid = 0
+        tarinfo.gid = 0
+        tarinfo.uname = "root"
+        tarinfo.gname = "root"
+        return tarinfo
+
+    with tarfile.open(output_tar, "w:gz") as tar:
+        for item in sorted(os.listdir(staging_dir)):
+            item_path = os.path.join(staging_dir, item)
+            tar.add(item_path, arcname=item, filter=reset_tarinfo)
     print(f"[ALPINE] Built {output_tar} ({os.path.getsize(output_tar)} bytes)")
 
 

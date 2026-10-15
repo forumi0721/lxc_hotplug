@@ -119,6 +119,8 @@ class GuestAgentDaemon:
                 self.logger.info(f"[ACCEPT REMOVE] Removing node for {devname}")
                 self.node_engine.remove_node(devname)
                 self.timer_engine.on_device_event()
+            else:
+                self.logger.info(f"[DROP REMOVE] Device {devname} does not match guest filter rules.")
 
     def run(self):
         """Starts Guest Agent daemon loop."""

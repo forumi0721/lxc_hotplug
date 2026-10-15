@@ -80,8 +80,8 @@ unprivileged: 0
 # 호스트의 실제 /dev 를 컨테이너의 /dev/.lxc/dev 로 바인드 마운트 (읽기 전용 추천)
 mp0: /dev,mp=/dev/.lxc/dev,ro=1
 
-# Hotplug 통신 소켓 디렉터리 마운트
-mp1: /run/lxc-hotplug,mp=/run/lxc-hotplug,shared=1
+# Hotplug 통신 소켓 디렉터리 마운트 (컨테이너 systemd tmpfs에 덮어씌워지지 않도록 /var/lib/ 에 마운트)
+mp1: /run/lxc-hotplug,mp=/var/lib/lxc-hotplug,shared=1
 
 # cgroup v2 캐릭터 디바이스 허용 (미지의 USB 장치 유연한 수용 권장)
 lxc.cgroup2.devices.allow: c *:* rwm
@@ -114,7 +114,7 @@ containers:
 ### Guest 설정 (`/etc/lxc-hotplug/guest.yaml`)
 ```yaml
 vmid: 100
-socket_path: "/run/lxc-hotplug/100.sock"
+socket_path: "/var/lib/lxc-hotplug/100.sock"
 
 # 호스트의 /dev 가 마운트된 컨테이너 내부 경로
 host_dev_dir: "/dev/.lxc/dev"

@@ -166,5 +166,27 @@ class TestStandalonePackage(unittest.TestCase):
             self.assertIn("Path to host config file", res.stdout)
 
 
+class TestConfigParser(unittest.TestCase):
+    def test_pure_python_yaml_parsing(self):
+        from lxc_hotplug.common.config import _parse_simple_yaml
+        # Test guest config with commented VID/PID
+        guest_yaml = """
+vmid: 100
+socket_path: "/run/lxc-hotplug/100.sock"
+filters:
+  - subsystem: "tty"
+    devname_pattern: "ttyACM*|ttyUSB*"
+  - subsystem: "sound"
+    #vendor_id: "0d8c"
+  - subsystem: "hidraw"
+"""
+        parsed = _parse_simple_yaml(guest_yaml)
+        self.assertEqual(parsed["vmid"], 100)
+        self.assertIsInstance(parsed["filters"], list)
+        self.assertEqual(len(parsed["filters"]), 3)
+        self.assertEqual(parsed["filters"][1]["subsystem"], "sound")
+        self.assertEqual(parsed["filters"][2]["subsystem"], "hidraw")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -4,8 +4,8 @@
 # Container VMID matching the host mapping
 vmid: 100
 
-# Path to the mounted Unix Domain Socket
-socket_path: "/run/lxc-hotplug/100.sock"
+# Path to the mounted Unix Domain Socket (under persistent rootfs to avoid /run tmpfs shadowing)
+socket_path: "/var/lib/lxc-hotplug/100.sock"
 
 # Path where the host's actual /dev is mounted inside the container
 host_dev_dir: "/dev/.lxc/dev"
