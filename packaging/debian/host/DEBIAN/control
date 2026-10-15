@@ -1,0 +1,10 @@
+Package: lxc-hotplug-host
+Version: 1.0.0
+Section: admin
+Priority: optional
+Architecture: all
+Depends: python3 (>= 3.7)
+Maintainer: LXC Hotplug Team <support@example.com>
+Description: LXC USB Hotplug Host Agent for Proxmox VE
+ Daemon running on Proxmox VE host that monitors USB events via kernel netlink
+ and notifies privileged LXC containers with dynamic cgroup v2 permissions.

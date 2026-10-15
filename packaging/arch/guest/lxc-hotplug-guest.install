@@ -1,0 +1,15 @@
+post_install() {
+    echo ":: Enabling and reloading systemd units..."
+    systemctl daemon-reload
+    echo ":: To start the guest service, configure /etc/lxc-hotplug/guest.yaml and run:"
+    echo "::   systemctl enable --now lxc-hotplug-guest.service"
+}
+
+pre_remove() {
+    systemctl stop lxc-hotplug-guest.service 2>/dev/null || true
+    systemctl disable lxc-hotplug-guest.service 2>/dev/null || true
+}
+
+post_remove() {
+    systemctl daemon-reload
+}

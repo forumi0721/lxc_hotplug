@@ -152,45 +152,77 @@ filters:
 
 ---
 
-## 📦 소스 배포 및 ZIP 패키징
+---
 
-Makefile을 통해 호스트 및 게스트용 독립 배포 ZIP 패키지를 즉시 생성할 수 있습니다:
+## 📦 배포판별 네이티브 패키징 및 배포 가이드
+
+`Makefile`을 통해 **Debian / Ubuntu (.deb)**, **Arch Linux (.pkg.tar.zst)**, **Alpine Linux (OpenRC 번들)**, 그리고 **Portable ZIP** 패키지를 손쉽게 빌드할 수 있습니다:
 
 ```bash
-# 전체 빌드 및 테스트, 모든 ZIP 패키지 생성
+# 모든 배포판 패키지 일괄 빌드
 make dist
 
-# 개별 패키지 생성
-make host-zip    # dist/lxc-hotplug-host.zip 생성 (호스트용)
-make guest-zip   # dist/lxc-hotplug-guest.zip 생성 (게스트용)
-make all-zip     # dist/lxc-hotplug-all.zip 생성 (전체 소스)
+# 배포판별 개별 빌드
+make deb        # Debian/Ubuntu .deb 패키지 빌드 (host & guest)
+make arch       # Arch Linux pacman .pkg.tar.zst 패키지 빌드 (host & guest)
+make alpine     # Alpine Linux OpenRC 패키지 빌드 (host & guest)
+make zip        # 독립 실행형 ZIP 아카이브 빌드 (host & guest)
 ```
 
-### 배포 및 설치 방법
+---
 
-#### 1) Proxmox 호스트 배포
+### 🚀 배포판별 설치 방법
+
+#### 1. Debian / Ubuntu / Proxmox VE (`.deb`)
+
 ```bash
-# 1. 호스트로 zip 복사 후 압축 해제
-unzip lxc-hotplug-host.zip -d /tmp/lxc_host
-cd /tmp/lxc_host
-
-# 2. 설치 스크립트 실행 (/opt/lxc_hotplug 로 자동 배포 및 systemd 등록)
-sudo bash scripts/install-host.sh
-
-# 3. /etc/lxc-hotplug/host.yaml 수정 후 서비스 시작
+# Proxmox 호스트 설치
+sudo apt install ./dist/lxc-hotplug-host_1.0.0_all.deb
+# /etc/lxc-hotplug/host.yaml 설정 후 시작
 sudo systemctl start lxc-hotplug-host.service
+
+# Debian/Ubuntu LXC 컨테이너(Guest) 설치
+sudo apt install ./dist/lxc-hotplug-guest_1.0.0_all.deb
+# /etc/lxc-hotplug/guest.yaml 설정 후 시작
+sudo systemctl start lxc-hotplug-guest.service
 ```
 
-#### 2) LXC 컨테이너 배포
+#### 2. Arch Linux (`.pkg.tar.zst` 또는 `PKGBUILD`)
+
 ```bash
-# 1. 컨테이너 내부로 zip 복사 후 압축 해제
+# 빌드된 패키지로 직접 설치 (pacman)
+# 호스트 또는 게스트 컨테이너 내부에서:
+sudo pacman -U ./dist/lxc-hotplug-guest-1.0.0-1-any.pkg.tar.zst
+
+# 서비스 활성화 및 시작
+sudo systemctl enable --now lxc-hotplug-guest.service
+
+# (대안) PKGBUILD로 직접 빌드할 경우
+cd packaging/arch/guest && makepkg -si
+```
+
+#### 3. Alpine Linux (OpenRC)
+
+Alpine Linux는 systemd 대신 **OpenRC**를 사용하므로 전용 init 스크립트(`/etc/init.d/`)가 내장된 번들을 제공합니다:
+
+```bash
+# Alpine 컨테이너 내부로 tar.gz 복사 후 설치
+tar -xzf dist/lxc-hotplug-guest-1.0.0-alpine.tar.gz -C /tmp/lxc_guest
+cd /tmp/lxc_guest
+sudo ./install-alpine.sh
+
+# /etc/lxc-hotplug/guest.yaml 설정 확인 후 OpenRC 서비스 시작
+sudo rc-service lxc-hotplug-guest start
+sudo rc-update add lxc-hotplug-guest default
+```
+
+#### 4. 범용 Standalone ZIP 배포 (어디서나 설치)
+
+```bash
+# ZIP 압축 해제 후 원클릭 설치 스크립트 실행
 unzip lxc-hotplug-guest.zip -d /tmp/lxc_guest
 cd /tmp/lxc_guest
-
-# 2. 설치 스크립트 실행 (/opt/lxc_hotplug 로 자동 배포 및 systemd 등록)
 sudo bash scripts/install-guest.sh
-
-# 3. /etc/lxc-hotplug/guest.yaml 수정 후 서비스 시작
 sudo systemctl start lxc-hotplug-guest.service
 ```
 

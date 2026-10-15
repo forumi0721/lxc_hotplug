@@ -1,0 +1,15 @@
+post_install() {
+    echo ":: Enabling and reloading systemd units..."
+    systemctl daemon-reload
+    echo ":: To start the host service, configure /etc/lxc-hotplug/host.yaml and run:"
+    echo "::   systemctl enable --now lxc-hotplug-host.service"
+}
+
+pre_remove() {
+    systemctl stop lxc-hotplug-host.service 2>/dev/null || true
+    systemctl disable lxc-hotplug-host.service 2>/dev/null || true
+}
+
+post_remove() {
+    systemctl daemon-reload
+}

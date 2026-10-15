@@ -1,0 +1,30 @@
+# Contributor: LXC Hotplug Team
+# Maintainer: LXC Hotplug Team
+pkgname=lxc-hotplug-guest
+pkgver=1.0.0
+pkgrel=0
+pkgdesc="LXC USB Hotplug Guest Agent for Privileged Alpine Linux Containers"
+url="https://github.com/forumi0721/lxc_hotplug"
+arch="noarch"
+license="MIT"
+depends="python3"
+install=""
+subpackages=""
+source="lxc-hotplug-guest.initd"
+
+package() {
+    # Install Python modules
+    install -d "$pkgdir/opt/lxc_hotplug/src/lxc_hotplug"
+    cp -r "$startdir/../../../src/lxc_hotplug/common" "$pkgdir/opt/lxc_hotplug/src/lxc_hotplug/"
+    cp -r "$startdir/../../../src/lxc_hotplug/guest" "$pkgdir/opt/lxc_hotplug/src/lxc_hotplug/"
+    install -m 644 "$startdir/../../../src/lxc_hotplug/__init__.py" "$pkgdir/opt/lxc_hotplug/src/lxc_hotplug/"
+    install -m 644 "$startdir/../../../src/lxc_hotplug/__main__.py" "$pkgdir/opt/lxc_hotplug/src/lxc_hotplug/"
+
+    # Install configuration & hooks
+    install -d "$pkgdir/etc/lxc-hotplug/hooks.d"
+    install -m 644 "$startdir/../../../config/guest.yaml.example" "$pkgdir/etc/lxc-hotplug/guest.yaml.example"
+
+    # Install OpenRC init service
+    install -d "$pkgdir/etc/init.d"
+    install -m 755 "$srcdir/lxc-hotplug-guest.initd" "$pkgdir/etc/init.d/lxc-hotplug-guest"
+}

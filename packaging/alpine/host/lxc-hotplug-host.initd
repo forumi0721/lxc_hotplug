@@ -1,0 +1,18 @@
+#!/sbin/openrc-run
+name="lxc-hotplug-host"
+description="LXC USB Hotplug Host Agent"
+
+command="/usr/bin/python3"
+command_args="-m lxc_hotplug host --config /etc/lxc-hotplug/host.yaml"
+command_background="yes"
+directory="/opt/lxc_hotplug"
+pidfile="/run/${RC_SVCNAME}.pid"
+output_log="/var/log/${RC_SVCNAME}.log"
+error_log="/var/log/${RC_SVCNAME}.err"
+
+export PYTHONPATH="/opt/lxc_hotplug/src"
+
+depend() {
+    need localmount
+    after bootmisc
+}

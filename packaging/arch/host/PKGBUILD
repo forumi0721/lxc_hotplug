@@ -1,0 +1,28 @@
+# Maintainer: LXC Hotplug Team
+pkgname=lxc-hotplug-host
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="LXC USB Hotplug Host Agent for Proxmox / Arch Linux"
+arch=('any')
+url="https://github.com/forumi0721/lxc_hotplug"
+license=('MIT')
+depends=('python')
+install=lxc-hotplug-host.install
+backup=('etc/lxc-hotplug/host.yaml')
+
+package() {
+    # Install Python modules
+    install -d "$pkgdir/opt/lxc_hotplug/src/lxc_hotplug"
+    cp -r "$srcdir/../../../src/lxc_hotplug/common" "$pkgdir/opt/lxc_hotplug/src/lxc_hotplug/"
+    cp -r "$srcdir/../../../src/lxc_hotplug/host" "$pkgdir/opt/lxc_hotplug/src/lxc_hotplug/"
+    install -m 644 "$srcdir/../../../src/lxc_hotplug/__init__.py" "$pkgdir/opt/lxc_hotplug/src/lxc_hotplug/"
+    install -m 644 "$srcdir/../../../src/lxc_hotplug/__main__.py" "$pkgdir/opt/lxc_hotplug/src/lxc_hotplug/"
+
+    # Install configuration
+    install -d "$pkgdir/etc/lxc-hotplug"
+    install -m 644 "$srcdir/../../../config/host.yaml.example" "$pkgdir/etc/lxc-hotplug/host.yaml"
+
+    # Install systemd service
+    install -d "$pkgdir/usr/lib/systemd/system"
+    install -m 644 "$srcdir/../../../systemd/lxc-hotplug-host.service" "$pkgdir/usr/lib/systemd/system/lxc-hotplug-host.service"
+}

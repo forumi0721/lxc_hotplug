@@ -1,0 +1,10 @@
+Package: lxc-hotplug-guest
+Version: 1.0.0
+Section: admin
+Priority: optional
+Architecture: all
+Depends: python3 (>= 3.7)
+Maintainer: LXC Hotplug Team <support@example.com>
+Description: LXC USB Hotplug Guest Agent for Privileged LXC Containers
+ Daemon running inside privileged LXC container that mirrors host USB devices
+ from /dev/.lxc/dev to container /dev using mknod and provides debounce timers.

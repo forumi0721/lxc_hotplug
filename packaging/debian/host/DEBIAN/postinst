@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    mkdir -p /run/lxc-hotplug
+    chmod 755 /run/lxc-hotplug
+
+    if [ ! -f /etc/lxc-hotplug/host.yaml ]; then
+        mkdir -p /etc/lxc-hotplug
+        cp /opt/lxc_hotplug/config/host.yaml.example /etc/lxc-hotplug/host.yaml
+    fi
+
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload || true
+        systemctl enable lxc-hotplug-host.service || true
+    fi
+fi
+
+exit 0

@@ -1,0 +1,25 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    mkdir -p /etc/lxc-hotplug/hooks.d
+
+    if [ ! -f /etc/lxc-hotplug/guest.yaml ]; then
+        cp /opt/lxc_hotplug/config/guest.yaml.example /etc/lxc-hotplug/guest.yaml
+    fi
+
+    if [ ! -f /etc/lxc-hotplug/hooks.d/on-change.sh ]; then
+        cat << 'EOF' > /etc/lxc-hotplug/hooks.d/on-change.sh
+#!/usr/bin/env bash
+logger -t lxc-hotplug "USB devices settled and synchronized."
+EOF
+        chmod +x /etc/lxc-hotplug/hooks.d/on-change.sh
+    fi
+
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload || true
+        systemctl enable lxc-hotplug-guest.service || true
+    fi
+fi
+
+exit 0
